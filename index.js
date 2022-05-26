@@ -31,6 +31,24 @@ async function run() {
             res.send(item);
         });
 
+
+        app.post('/order', async (req, res) => {
+            const order = req.body;
+            if (order.quantityItem < order.minQuantity || order.quantityItem > order.availableQuantity) {
+                const query = { quantityItem: order.quantityItem, minQuantity: order.minQuantity, availableQuantity: order.availableQuantity }
+                const exists = await orderCollection.findOne(query);
+                return res.send({ success: false, order: exists })
+
+
+
+            }
+            const result = await orderCollection.insertOne(order);
+            return res.send({ success: true, result });
+
+
+        });
+
+
     }
     finally {
 
