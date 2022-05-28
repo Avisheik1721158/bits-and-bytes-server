@@ -5,6 +5,7 @@ require('dotenv').config();
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
 const app = express();
 const port = process.env.PORT || 5000;
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
 
 app.use(cors());
 const uri = `mongodb+srv://${process.env.DB_USER}:${process.env.DB_PASS}@cluster0.mhybc4g.mongodb.net/?retryWrites=true&w=majority`
@@ -34,6 +35,8 @@ async function run() {
         const itemCollection = client.db('bits-and-bytes').collection('items');
         const orderCollection = client.db('bits-and-bytes').collection('orders');
         const userCollection = client.db('bits-and-bytes').collection('users');
+        const paymentCollection = client.db('bits-and-bytes').collection('payments');
+        const reviewCollection = client.db('bits-and-bytes').collection('reviews');
 
         const verifyAdmin = async (req, res, next) => {
             const requester = req.decoded.email;
@@ -57,6 +60,13 @@ async function run() {
         app.post('/item', verifyJWT, verifyAdmin, async (req, res) => {
             const item = req.body;
             const result = await itemCollection.insertOne(item);
+            res.send(result);
+
+
+        });
+        app.post('/review', async (req, res) => {
+            const review = req.body;
+            const result = await reviewCollection.insertOne(review);
             res.send(result);
 
 
@@ -112,21 +122,6 @@ async function run() {
             }
 
         });
-        app.get('/order?userEmail', verifyJWT, verifyAdmin, async (req, res) => {
-            const orders = await orderCollection.find().toArray();
-            res.send(orders);
-
-        })
-
-
-
-        app.get('/item/:id', async (req, res) => {
-            const id = req.params.id;
-            const query = { _id: ObjectId(id) };
-            const item = await itemCollection.findOne(query);
-            res.send(item);
-        });
-
 
         app.post('/order', async (req, res) => {
             const order = req.body;
@@ -143,6 +138,85 @@ async function run() {
 
 
         });
+
+        app.get('/order/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const order = await orderCollection.findOne(query);
+            res.send(order)
+
+        });
+
+
+
+
+
+        app.get('/item/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const item = await itemCollection.findOne(query);
+            res.send(item);
+        });
+
+        app.delete('/item/:id', async (req, res) => {
+            const id = req.params.id;
+            const query = { _id: ObjectId(id) };
+            const result = await itemCollection.deleteOne(query);
+            res.send(result);
+
+        })
+
+        app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+            const price = req.body;
+            const amount = price.totalPrice;
+
+            const paymentIntent = await stripe.paymentIntents.create({
+                amount: amount,
+                currency: 'usd',
+                payment_method_types: ['card']
+            });
+            res.send({ clientSecret: paymentIntent.client_secret })
+        });
+
+
+        app.patch('/order/:id', verifyJWT, async (req, res) => {
+            const id = req.params.id;
+            const payment = req.body;
+            const filter = { _id: ObjectId(id) };
+            const updatedOrder = {
+                $set: {
+                    paid: true,
+                    transactionId: payment.transactionId
+                }
+            }
+
+            const result = await paymentCollection.insertOne(payment);
+            const updated = await orderCollection.updateOne(filter, updatedOrder);
+            res.send(updatedOrder);
+        });
+        app.get('/all', async (req, res) => {
+            const query = {};
+            const cursor = orderCollection.find(query);
+            const orders = await cursor.toArray();
+
+            res.send(orders);
+        });
+        app.get('/review', async (req, res) => {
+            const query = {};
+            const cursor = reviewCollection.find(query);
+            const reviews = await cursor.toArray();
+
+            res.send(reviews);
+        });
+
+        app.get('/payment', async (req, res) => {
+            const query = {};
+            const cursor = paymentCollection.find(query);
+            const payment = await cursor.toArray();
+
+            res.send(payment);
+        });
+
 
 
     }
