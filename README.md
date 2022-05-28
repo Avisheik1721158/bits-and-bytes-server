@@ -26,7 +26,7 @@ https://github.com/programming-hero-web-course1/manufacturer-website-client-side
 
 In this project we deploy our server site im heroku.
 and our secret key are store in env local.
-That's mean this site build with secure purpose.
+That's mean this site build with secure purpose. For more details you should visit my site.
 
 
 
